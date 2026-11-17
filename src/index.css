@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #f6f1e7;
+  --color-cream: #fdfbf6;
+  --color-sand: #ece6d8;
+  --color-ink: #16302b;
+  --color-ink-2: #1e403a;
+  --color-ink-3: #28524a;
+  --color-coral: #ff4b1f;
+  --color-coral-deep: #e03a12;
+  --color-amber: #ffb423;
+  --color-sage: #2e5b47;
+  --color-sage-soft: #e4ece4;
+  --color-sky: #2d6a8f;
+  --color-sky-soft: #e0eaef;
+  --color-rose: #c2483d;
+  --color-rose-soft: #f3e0dd;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --shadow-card: 0 24px 50px -22px rgb(22 48 43 / 0.4);
+  --shadow-lift: 0 14px 34px -18px rgb(22 48 43 / 0.35);
+  --shadow-pop: 0 8px 24px -10px rgb(22 48 43 / 0.45);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-amber);
+  color: var(--color-ink);
+}
+
+section[id] {
+  scroll-margin-top: 5.5rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-coral);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---- dotted ledger paper backdrop for hero ---- */
+.dot-grid {
+  background-image: radial-gradient(rgb(22 48 43 / 0.16) 1.15px, transparent 1.15px);
+  background-size: 22px 22px;
+}
+
+/* ---- diagonal stripe fill for accents ---- */
+.hatch {
+  background-image: repeating-linear-gradient(-45deg, rgb(22 48 43 / 0.9) 0 2px, transparent 2px 9px);
+}
+
+/* ---- marquees ---- */
+@keyframes marquee-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee {
+  width: max-content;
+  animation: marquee-left 42s linear infinite;
+}
+.marquee-paused:hover .marquee {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee { animation: none; }
+  html { scroll-behavior: auto; }
+}
+
+/* ---- motion primitives ---- */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.fade-up-1 { animation-delay: 0.07s; }
+.fade-up-2 { animation-delay: 0.14s; }
+.fade-up-3 { animation-delay: 0.21s; }
+.fade-up-4 { animation-delay: 0.3s; }
+
+@keyframes question-in {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.question-in { animation: question-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-10%) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(115vh) rotate(720deg); opacity: 0.85; }
+}
+.confetti-piece {
+  position: absolute;
+  top: -14px;
+  border-radius: 2px;
+  animation: confetti-fall linear infinite;
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.menu-in { animation: menu-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.overlay-in { animation: overlay-in 0.18s ease both; }
+
+@keyframes sheet-up {
+  from { opacity: 0; transform: translateY(26px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sheet-up { animation: sheet-up 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.toast-in { animation: toast-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes pop-in {
+  0% { transform: scale(0.55); opacity: 0; }
+  70% { transform: scale(1.12); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pop-in { animation: pop-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.bob { animation: bob 6s ease-in-out infinite; }
+
+/* ---- button sheen sweep ---- */
+.sheen {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.sheen::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  left: -30%;
+  width: 32%;
+  background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.7), transparent);
+  transform: translateX(-240%) skewX(-18deg);
+  z-index: 1;
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sheen:hover::after { transform: translateX(760%) skewX(-18deg); }
+
+/* ---- bar chart bars animate on mount ---- */
+@keyframes grow-bar {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.grow-bar { transform-origin: left center; animation: grow-bar 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ---- skip rendering work for below-fold sections until needed ---- */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 700px;
+}

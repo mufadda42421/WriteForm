@@ -166,6 +166,20 @@ export default function Builder({ params }) {
               className="mt-1.5 w-full border-b-2 border-transparent bg-transparent text-ink/80 outline-none transition-colors placeholder-ink/30 focus:border-coral"
             />
 
+            <label htmlFor="form-email" className="mt-4 block font-mono text-[9px] font-medium uppercase tracking-[0.3em] text-ink/45">Send responses to (optional)</label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Mail size={14} className="shrink-0 text-ink/35" aria-hidden="true" />
+              <input
+                id="form-email"
+                type="email"
+                value={draft.responseEmail ?? ''}
+                onChange={(e) => update({ responseEmail: e.target.value })}
+                placeholder="you@company.com"
+                className="w-full border-b-2 border-transparent bg-transparent text-ink/80 outline-none transition-colors placeholder-ink/30 focus:border-coral"
+              />
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-ink/45">Respondents finish with a one-tap “Email it” button addressed to you — no server involved.</p>
+
             <div className="mt-5 flex flex-wrap items-start justify-between gap-6 border-t border-ink/10 pt-5">
               <label className="flex max-w-sm cursor-pointer items-start gap-3">
                 <button

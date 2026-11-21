@@ -56,6 +56,10 @@ export const FAQS = [
     a: 'The share link encodes the complete form definition in the URL itself. When someone opens it, WriteForm rebuilds the form locally in their browser. Responses they submit are stored on the device that collects them, and you can export that browser’s results to CSV any time.',
   },
   {
+    q: 'How do responses from other people reach me?',
+    a: 'No server means a respondent’s browser can’t write into yours. Instead, when someone finishes your form they get a short response code with one-tap “Email it” (addressed to you if you set “Send responses to” in the builder), copy, or a .json download. Paste that code — or open the file — under Results → Import and the answer lands in your table, ready for CSV.',
+  },
+  {
     q: 'Can I embed a form on my website?',
     a: 'Yes. Every share sheet includes a ready-made iframe snippet you can paste into any page. The embedded form runs the same local-first flow.',
   },

@@ -19,7 +19,7 @@ const STEPS = [
     n: '3',
     icon: Inbox,
     title: 'Read',
-    body: 'Responses land locally and summarize themselves. Review them on this device and export clean CSV whenever you need.',
+    body: 'Answers arrive as a short code — copy it, email it, or import the .json file. Every response summarizes itself, ready for CSV.',
     chip: 'bg-sky-soft text-sky border-sky/25',
   },
 ]

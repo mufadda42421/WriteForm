@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ArrowLeft, RotateCcw, Star, CheckCircle2 } from 'lucide-react'
-import { addResponse, effectiveQuestions } from '../lib/store'
+import { ArrowRight, ArrowLeft, RotateCcw, Star, CheckCircle2, Copy, Check, Mail, Download } from 'lucide-react'
+import { addResponse, effectiveQuestions, encodeResponse, downloadFile } from '../lib/store'
 import { THEMES } from '../lib/themes'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -12,6 +12,8 @@ export default function Responder({ form, storage = true, compact = false, onSub
   const [step, setStep] = useState(0) // 0 welcome · 1..n questions · n+1 end
   const [answers, setAnswers] = useState({})
   const [error, setError] = useState('')
+  const [savedResponse, setSavedResponse] = useState(null)
+  const [copied, setCopied] = useState(false)
   const inputRef = useRef(null)
   const rootRef = useRef(null)
 
@@ -53,7 +55,7 @@ export default function Responder({ form, storage = true, compact = false, onSub
       return
     }
     if (step === total) {
-      if (storage) addResponse(form, answers)
+      if (storage) setSavedResponse(addResponse(form, answers))
       onSubmit?.(answers)
       setStep(total + 1)
       return
@@ -69,7 +71,32 @@ export default function Responder({ form, storage = true, compact = false, onSub
     window.setTimeout(() => setStep((s) => Math.min(s + 1, total + 1)), 240)
   }
 
-  const reset = () => { setStep(0); setAnswers({}); setError('') }
+  const reset = () => { setStep(0); setAnswers({}); setError(''); setSavedResponse(null); setCopied(false) }
+
+  const responseCode = savedResponse ? encodeResponse(form.id, savedResponse) : ''
+  const ownerEmail = (form?.responseEmail || '').trim()
+
+  const copyCode = async () => {
+    if (!responseCode) return
+    try {
+      await navigator.clipboard.writeText(responseCode)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = responseCode
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      el.remove()
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2200)
+  }
+
+  const downloadResponse = () => {
+    if (!savedResponse) return
+    const slug = (form.title || 'writeform').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'writeform'
+    downloadFile(`${slug}-response.json`, JSON.stringify({ formId: form.id, code: responseCode, response: savedResponse }, null, 2), 'application/json')
+  }
 
   const onKeyDown = (e) => {
     if (e.key === 'Escape') return
@@ -191,12 +218,60 @@ export default function Responder({ form, storage = true, compact = false, onSub
 
       {/* ---------- end ---------- */}
       {step > total && (
-        <div key="end" className="question-in flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center sm:p-10">
-          <span className="pop-in flex h-16 w-16 items-center justify-center rounded-full border border-sage/30 bg-sage-soft">
-            <CheckCircle2 size={30} className="text-sage" aria-hidden="true" />
+        <div key="end" className="question-in flex flex-1 flex-col items-center justify-center gap-3 overflow-y-auto p-5 text-center sm:p-8">
+          <span className="pop-in flex h-14 w-14 items-center justify-center rounded-full border border-sage/30 bg-sage-soft">
+            <CheckCircle2 size={28} className="text-sage" aria-hidden="true" />
           </span>
-          <h3 className="font-display text-3xl font-bold tracking-tight text-ink">That’s everything.</h3>
-          <p className="max-w-xs text-ink/60">{storage ? 'Your response was saved on this device.' : 'Thanks — that’s the WriteForm rhythm.'}</p>
+          <h3 className="font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">That’s everything.</h3>
+
+          {storage ? (
+            <p className="max-w-xs text-sm leading-snug text-ink/60">
+              Saved on this device. Answers don’t travel on their own — send this code to the form owner so it reaches their results.
+            </p>
+          ) : (
+            <p className="max-w-xs text-ink/60">Thanks — that’s the WriteForm rhythm.</p>
+          )}
+
+          {storage && savedResponse && (
+            <div className="mt-1 w-full max-w-md rounded-2xl border border-ink/12 bg-paper p-4 text-left">
+              <p className="font-mono text-[9px] font-medium uppercase tracking-[0.25em] text-ink/45">Send your response</p>
+              <p className="mt-1.5 text-xs leading-snug text-ink/65">
+                {ownerEmail
+                  ? `Tap “Email it” and your answer goes straight to ${ownerEmail}.`
+                  : 'Copy the code and send it to whoever shared this form — they import it in one tap.'}
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={copyCode}
+                  className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition-transform hover:scale-[1.03]"
+                  style={{ background: theme.accent, color: theme.text }}
+                >
+                  {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                  {copied ? 'Copied!' : 'Copy response code'}
+                </button>
+                <a
+                  href={`mailto:${encodeURIComponent(ownerEmail)}?subject=${encodeURIComponent(`Response to “${form.title || 'your form'}”`)}&body=${encodeURIComponent(`Here is my response code. Paste it into WriteForm → Results → Import responses.\n\n${responseCode}`)}`}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-ink/20 px-3.5 py-2 text-xs font-bold text-ink/75 transition-colors hover:border-ink hover:text-ink"
+                >
+                  <Mail size={14} aria-hidden="true" /> Email it
+                </a>
+                <button
+                  type="button"
+                  onClick={downloadResponse}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-ink/20 px-3.5 py-2 text-xs font-bold text-ink/75 transition-colors hover:border-ink hover:text-ink"
+                >
+                  <Download size={14} aria-hidden="true" /> .json
+                </button>
+              </div>
+
+              <p className="mt-2.5 break-all font-mono text-[9px] leading-relaxed text-ink/35" aria-hidden="true">
+                {responseCode.slice(0, 34)}…
+              </p>
+            </div>
+          )}
+
           <button type="button" onClick={reset} className="mt-1 inline-flex items-center gap-2 rounded-2xl border border-ink/15 px-5 py-2.5 text-sm font-semibold text-ink/75 transition-colors hover:border-ink hover:text-ink">
             <RotateCcw size={14} aria-hidden="true" /> Submit another response
           </button>

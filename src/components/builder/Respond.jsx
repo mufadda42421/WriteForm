@@ -30,7 +30,7 @@ export default function Respond({ encoded }) {
           <Responder form={form} storage />
         </div>
         <p className="mt-4 flex items-center justify-center gap-2 text-center font-mono text-[9px] uppercase tracking-[0.25em] text-ink/40">
-          <HardDrive size={11} aria-hidden="true" /> Saved on this device only
+          <HardDrive size={11} aria-hidden="true" /> Answers stay in your browser
           <span aria-hidden="true">·</span>
           <a href="#/builder" className="text-coral hover:underline">Make your own — free</a>
         </p>

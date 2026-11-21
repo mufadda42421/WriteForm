@@ -31,6 +31,7 @@ export function emptyForm() {
     description: '',
     theme: 'coral',
     askName: true,
+    responseEmail: '',
     questions: [
       { id: uid(), type: 'short', label: 'How can we help?', required: true, options: [] },
     ],
@@ -114,11 +115,89 @@ export function getCachedForm(id) {
   return safeParse(window.localStorage.getItem(formCacheKey(id)), null)
 }
 
+/* ------------------------------------------------------------------ *
+ * Response transfer — how an answer gets from the respondent's device
+ * back to the form owner without a server.
+ *
+ * The respondent's browser turns the finished answer into a short code
+ * (`WRF1.…`). They send that code back — copy/paste, email, or a file —
+ * and the owner imports it in the Results screen. Nothing is uploaded
+ * anywhere; the code *is* the transport.
+ * ------------------------------------------------------------------ */
+
+const RESPONSE_PREFIX = 'WRF1.'
+
+export function encodeResponse(formId, response) {
+  const payload = {
+    f: formId,
+    r: {
+      id: response.id,
+      submittedAt: response.submittedAt,
+      answers: response.answers,
+    },
+  }
+  return RESPONSE_PREFIX + b64urlEncode(JSON.stringify(payload))
+}
+
+export function decodeResponse(code) {
+  const text = String(code ?? '').trim()
+  if (!text) return null
+  const body = text.startsWith(RESPONSE_PREFIX) ? text.slice(RESPONSE_PREFIX.length) : text
+  try {
+    const parsed = JSON.parse(b64urlDecode(body))
+    if (!parsed?.f || !parsed?.r || typeof parsed.r !== 'object') return null
+    return {
+      formId: String(parsed.f),
+      response: {
+        id: String(parsed.r.id || uid()),
+        submittedAt: Number(parsed.r.submittedAt) || Date.now(),
+        answers: parsed.r.answers && typeof parsed.r.answers === 'object' ? parsed.r.answers : {},
+      },
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Accepts a paste containing one or many codes, separated by whitespace. */
+export function extractResponses(text) {
+  return String(text ?? '')
+    .split(/[\s,]+/)
+    .map(decodeResponse)
+    .filter(Boolean)
+}
+
+/**
+ * Merge imported responses into this device's store, skipping any whose id
+ * is already present. Returns the number actually added.
+ */
+export function mergeResponses(formId, incoming) {
+  const rows = loadResponses(formId)
+  const seen = new Set(rows.map((r) => r.id))
+  let added = 0
+  for (const response of incoming) {
+    if (!response?.id || seen.has(response.id)) continue
+    seen.add(response.id)
+    rows.push(response)
+    added += 1
+  }
+  if (added > 0) saveResponses(formId, rows)
+  return added
+}
+
 /* ---------- URL encoding (share links work with zero backend) ---------- */
 
 function toSharePayload(form) {
-  const { id, title, description, theme, questions, askName } = form
-  return { id, title, description, theme, questions, askName: Boolean(askName) }
+  const { id, title, description, theme, questions, askName, responseEmail } = form
+  return {
+    id,
+    title,
+    description,
+    theme,
+    questions,
+    askName: Boolean(askName),
+    responseEmail: typeof responseEmail === 'string' ? responseEmail.trim() : '',
+  }
 }
 
 function b64urlEncode(str) {
@@ -149,6 +228,7 @@ export function decodeForm(encoded) {
       theme: parsed.theme || 'coral',
       description: parsed.description || '',
       askName: Boolean(parsed.askName),
+      responseEmail: typeof parsed.responseEmail === 'string' ? parsed.responseEmail : '',
       questions: parsed.questions.map((q) => ({
         id: q.id || uid(),
         type: q.type || 'short',

@@ -1,9 +1,46 @@
-import { useMemo, useState } from 'react'
-import { ArrowLeft, Share2, Download, Trash2, Inbox, Star, ExternalLink, AlertCircle } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Share2, Download, Trash2, Inbox, Star, ExternalLink, AlertCircle, Upload, FileJson, Check } from 'lucide-react'
 import Logo from '../Logo'
+import Modal from '../Modal'
 import ShareModal from '../ShareModal'
 import { useToast } from '../../lib/toast-context'
-import { getForm, getCachedForm, loadResponses, clearResponses, saveResponses, formToCSV, downloadFile, shareUrl, effectiveQuestions } from '../../lib/store'
+import {
+  getForm, getCachedForm, loadResponses, clearResponses, saveResponses,
+  formToCSV, downloadFile, shareUrl, effectiveQuestions,
+  decodeResponse, extractResponses, mergeResponses,
+} from '../../lib/store'
+
+/**
+ * Turn pasted text or a downloaded `.json` file into a list of
+ * `{ formId, response }` records. Accepts: one code, many codes separated
+ * by whitespace, a JSON array, or the `{ formId, code, response }` file
+ * the responder can download.
+ */
+function parseImport(raw) {
+  const text = String(raw ?? '').trim()
+  if (!text) return []
+  if (text.startsWith('{') || text.startsWith('[')) {
+    try {
+      const data = JSON.parse(text)
+      const items = Array.isArray(data) ? data : [data]
+      const out = []
+      for (const item of items) {
+        if (!item) continue
+        if (typeof item.code === 'string') {
+          const decoded = decodeResponse(item.code)
+          if (decoded) { out.push(decoded); continue }
+        }
+        if (typeof item.formId === 'string' && item.response) {
+          out.push({ formId: item.formId, response: item.response })
+        }
+      }
+      if (out.length > 0) return out
+    } catch {
+      // Not JSON — treat it as raw code text below.
+    }
+  }
+  return extractResponses(text)
+}
 
 export default function Results({ formId }) {
   const { showToast } = useToast()
@@ -11,6 +48,10 @@ export default function Results({ formId }) {
   const [responses, setResponses] = useState(() => loadResponses(formId))
   const [shareOpen, setShareOpen] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importNote, setImportNote] = useState(null) // { tone: 'ok' | 'error', text }
+  const fileRef = useRef(null)
 
   const effective = useMemo(() => (form ? effectiveQuestions(form) : []), [form])
   const summaries = useMemo(() => (form ? effective.map((q) => buildSummary(q, responses)) : []), [form, effective, responses])
@@ -46,6 +87,39 @@ export default function Results({ formId }) {
     setResponses(next)
   }
 
+  const runImport = (raw) => {
+    const parsed = parseImport(raw)
+    if (parsed.length === 0) {
+      setImportNote({
+        tone: 'error',
+        text: 'No valid response code found. Ask the respondent to copy the whole code — it starts with WRF1. — and paste it again.',
+      })
+      return
+    }
+    const mine = parsed.filter((p) => p.formId === form.id).map((p) => p.response)
+    const skipped = parsed.length - mine.length
+    const added = mergeResponses(form.id, mine)
+    setResponses(loadResponses(form.id))
+    if (added > 0) {
+      setImportNote({ tone: 'ok', text: `Added ${added} response${added === 1 ? '' : 's'}${skipped ? ` · skipped ${skipped} from another form` : ''}.` })
+      showToast(`Imported ${added} response${added === 1 ? '' : 's'}`)
+      setImportText('')
+    } else if (mine.length > 0) {
+      setImportNote({ tone: 'ok', text: 'Those responses are already here — nothing new to add.' })
+    } else {
+      setImportNote({ tone: 'error', text: `That code belongs to a different form (${parsed[0].formId}). Open that form’s results to import it.` })
+    }
+  }
+
+  const onImportFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const text = await file.text()
+    setImportText(text)
+    runImport(text)
+    e.target.value = ''
+  }
+
   const sorted = [...responses].sort((a, b) => b.submittedAt - a.submittedAt)
 
   return (
@@ -58,6 +132,9 @@ export default function Results({ formId }) {
             <span className="font-display font-bold text-ink sm:hidden">writeform</span>
           </a>
           <div className="flex items-center gap-2">
+            <button type="button" onClick={() => { setImportOpen(true); setImportNote(null) }} className="inline-flex items-center gap-1.5 rounded-xl border border-ink/20 px-3 py-2 text-xs font-bold text-ink transition-colors hover:border-ink hover:bg-ink hover:text-cream sm:text-sm">
+              <Upload size={14} aria-hidden="true" /> Import
+            </button>
             <button type="button" onClick={exportCSV} className="inline-flex items-center gap-1.5 rounded-xl border border-ink/20 px-3 py-2 text-xs font-bold text-ink transition-colors hover:border-ink hover:bg-ink hover:text-cream sm:text-sm">
               <Download size={14} aria-hidden="true" /> CSV
             </button>
@@ -92,10 +169,11 @@ export default function Results({ formId }) {
           <div className="mt-12 flex flex-col items-center rounded-3xl border border-dashed border-ink/25 bg-cream/60 px-6 py-16 text-center">
             <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sand"><Inbox size={28} className="text-ink/40" aria-hidden="true" /></span>
             <h2 className="mt-5 font-display text-2xl font-bold text-ink">Waiting for the first answer</h2>
-            <p className="mt-1.5 max-w-sm text-ink/60">Share the form and responses will appear here, stored safely in this browser.</p>
+            <p className="mt-1.5 max-w-md text-ink/60">A respondent’s browser can’t write to yours, so answers come back as a short code they send you. Paste it here and it lands in this table.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-2">
               <a href={`#/f/${shareUrl(form).split('#/f/')[1]}`} className="inline-flex items-center gap-2 rounded-2xl bg-ink px-5 py-3 text-sm font-bold text-cream"><ExternalLink size={15} aria-hidden="true" /> Open the form</a>
               <button type="button" onClick={() => setShareOpen(true)} className="sheen inline-flex items-center gap-2 rounded-2xl bg-coral px-5 py-3 text-sm font-bold text-white"><Share2 size={15} aria-hidden="true" /> Share the link</button>
+              <button type="button" onClick={() => { setImportOpen(true); setImportNote(null) }} className="inline-flex items-center gap-2 rounded-2xl border border-ink/20 px-5 py-3 text-sm font-bold text-ink transition-colors hover:border-ink"><Upload size={15} aria-hidden="true" /> Import a response</button>
             </div>
           </div>
         ) : (
@@ -139,6 +217,47 @@ export default function Results({ formId }) {
           </>
         )}
       </main>
+
+      <Modal open={importOpen} onClose={() => setImportOpen(false)} labelledBy="import-title">
+        <div className="p-6 sm:p-7">
+          <p className="font-mono text-[10px] font-medium uppercase tracking-[0.3em] text-coral">Bring answers in</p>
+          <h2 id="import-title" className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">Import responses</h2>
+          <p className="mt-1.5 text-sm leading-snug text-ink/60">
+            Paste the code a respondent sent you (it starts with <span className="font-mono text-ink/80">WRF1.</span>) or open the <span className="font-mono text-ink/80">.json</span> file they downloaded. Several codes at once are fine.
+          </p>
+
+          <label htmlFor="import-text" className="mt-4 block font-mono text-[9px] font-medium uppercase tracking-[0.25em] text-ink/45">Response code(s)</label>
+          <textarea
+            id="import-text"
+            rows={4}
+            value={importText}
+            onChange={(e) => { setImportText(e.target.value); setImportNote(null) }}
+            placeholder="WRF1.eyJmIjoi…"
+            className="mt-1.5 w-full resize-y rounded-2xl border border-ink/15 bg-paper p-3 font-mono text-[11px] leading-relaxed text-ink outline-none transition-colors placeholder-ink/25 focus:border-coral"
+          />
+
+          {importNote && (
+            <p role="status" className={`mt-2 rounded-xl border px-3 py-2 text-xs font-medium leading-snug ${importNote.tone === 'ok' ? 'border-sage/30 bg-sage-soft text-sage' : 'border-rose/30 bg-rose-soft text-rose'}`}>
+              {importNote.text}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => runImport(importText)} disabled={!importText.trim()} className="sheen inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2.5 text-sm font-bold text-cream disabled:cursor-not-allowed disabled:opacity-40">
+              <Check size={15} aria-hidden="true" /> Import
+            </button>
+            <button type="button" onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1.5 rounded-xl border border-ink/20 px-4 py-2.5 text-sm font-bold text-ink/75 transition-colors hover:border-ink hover:text-ink">
+              <FileJson size={15} aria-hidden="true" /> Choose a file
+            </button>
+            <input ref={fileRef} type="file" accept="application/json,.json,.txt" onChange={onImportFile} className="hidden" />
+            <button type="button" onClick={() => setImportOpen(false)} className="ml-auto rounded-xl px-3 py-2.5 text-sm font-semibold text-ink/50 transition-colors hover:text-ink">Done</button>
+          </div>
+
+          <p className="mt-4 border-t border-ink/10 pt-3 text-[11px] leading-snug text-ink/45">
+            Tip: set “Send responses to” in the builder and every respondent gets a one-tap “Email it” button addressed to you.
+          </p>
+        </div>
+      </Modal>
 
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} form={form} />
     </div>
